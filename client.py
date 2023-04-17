@@ -26,7 +26,6 @@ class IPyAPI:
             url = f"{self.__base_url}/{ip_address}/json"
         else:
             url = f"{self.__base_url}/json"
-        print(url)
         response = self.perform_request(url=url)
         if is_json:
             return response.json()
