@@ -21,8 +21,12 @@ class IPyAPI:
         response.raise_for_status()
         return response
 
-    def get_client_ip(self, is_json: bool = True) -> Any | IpResponse:
-        url = f"{self.__base_url}/json"
+    def get_ip_info(self, ip_address: str = None, is_json: bool = True) -> Any | IpResponse:
+        if ip_address is not None:
+            url = f"{self.__base_url}/{ip_address}/json"
+        else:
+            url = f"{self.__base_url}/json"
+        print(url)
         response = self.perform_request(url=url)
         if is_json:
             return response.json()
