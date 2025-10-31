@@ -16,7 +16,7 @@ A modern, feature-complete Python client library for the [ipapi.co](https://ipap
 - **Type Hints**: Full type annotations for better IDE support
 - **Error Handling**: Comprehensive exception handling for all API errors
 - **Well Tested**: Extensive test coverage with pytest
-- **Modern Python**: Built for Python 3.9+
+- **Modern Python**: Built for Python 3.10+
 
 ## Installation
 
