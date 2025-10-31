@@ -117,9 +117,7 @@ def test_get_location_raw_json(httpx_mock: HTTPXMock, sample_response):
     """Test get_location_raw with JSON format."""
     import json
 
-    httpx_mock.add_response(
-        url="https://ipapi.co/8.8.8.8/json/", text=json.dumps(sample_response)
-    )
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", text=json.dumps(sample_response))
 
     with IPyAPI() as client:
         raw_data = client.get_location_raw("8.8.8.8", format="json")
@@ -155,9 +153,7 @@ def test_convenience_methods(httpx_mock: HTTPXMock):
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/city/", text="Mountain View")
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/country/", text="US")
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/country_name/", text="United States")
-    httpx_mock.add_response(
-        url="https://ipapi.co/8.8.8.8/timezone/", text="America/Los_Angeles"
-    )
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/timezone/", text="America/Los_Angeles")
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/currency/", text="USD")
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/asn/", text="AS15169")
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/org/", text="Google LLC")
