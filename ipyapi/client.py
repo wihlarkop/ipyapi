@@ -62,14 +62,18 @@ class IPyAPI:
         ...     location = client.get_location("8.8.8.8")
     """
 
-    def __init__(self, base_url: str = "https://ipapi.co", timeout: float = 10.0) -> None:
+    def __init__(
+        self, api_key: str | None = None, base_url: str = "https://ipapi.co", timeout: float = 10.0
+    ) -> None:
         """Initialize the IPyAPI client.
 
         Args:
+            api_key: Optional API key for authenticated requests (for paid plans)
             base_url: Base URL for the API (default: https://ipapi.co)
             timeout: Request timeout in seconds (default: 10.0)
         """
         self._base_url = base_url.rstrip("/")
+        self._api_key = api_key
         self._client = httpx.Client(timeout=timeout)
 
     def __enter__(self) -> "IPyAPI":
@@ -137,7 +141,8 @@ class IPyAPI:
             Various IPyAPIError subclasses depending on error type
         """
         url = f"{self._base_url}/{endpoint}"
-        response = self._client.get(url)
+        params = {"key": self._api_key} if self._api_key else None
+        response = self._client.get(url, params=params)
 
         if response.status_code != 200:
             self._handle_error_response(response)

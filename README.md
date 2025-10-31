@@ -39,7 +39,7 @@ uv add ipyapi
 ```python
 from ipyapi import IPyAPI
 
-# Using context manager (recommended)
+# Free tier (no API key required)
 with IPyAPI() as client:
     # Get complete location data
     location = client.get_location("8.8.8.8")
@@ -53,6 +53,11 @@ with IPyAPI() as client:
     # Get your own IP info
     my_location = client.get_location()
     print(my_location.ip)
+
+# With API key (for paid plans)
+with IPyAPI(api_key="your_api_key_here") as client:
+    location = client.get_location("8.8.8.8")
+    print(location.country_name)
 ```
 
 ### Asynchronous Usage
