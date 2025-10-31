@@ -61,10 +61,9 @@ jobs:
 
       - name: Check distribution
         run: |
-          uv pip install --system twine
-          uv run twine check dist/*
+          pipx run twine check dist/*
 
       - name: Test installation
         run: |
-          uv pip install --system dist/*.whl
+          python -m pip install --break-system-packages dist/*.whl
           python -c "from ipyapi import IPyAPI, AsyncIPyAPI; print('Import successful!')"
