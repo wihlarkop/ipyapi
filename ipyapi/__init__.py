@@ -33,7 +33,8 @@ from .exceptions import (
     RateLimitError,
     ReservedIPAddressError,
 )
-from .models import ErrorResponse, IPLocation
+from .models import ErrorResponse, IPLocation, PydanticIPLocation
+from .types import ReturnType
 
 __version__ = "0.1.0"
 __all__ = [
@@ -43,6 +44,9 @@ __all__ = [
     # Models
     "IPLocation",
     "ErrorResponse",
+    "PydanticIPLocation",
+    # Types
+    "ReturnType",
     # Exceptions
     "IPyAPIError",
     "BadRequestError",
