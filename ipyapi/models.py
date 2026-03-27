@@ -92,6 +92,9 @@ class IPLocation:
     hostname: str | None = None
     """Hostname (optional field, requires hostname add-on)"""
 
+    latlong: str | None = None
+    """Combined latitude and longitude as comma-separated string (e.g. '37.386,-122.0838')"""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "IPLocation":
         """Create IPLocation from API response dictionary.
@@ -131,6 +134,7 @@ class IPLocation:
             asn=data.get("asn", ""),
             org=data.get("org", ""),
             hostname=data.get("hostname"),
+            latlong=data.get("latlong"),
         )
 
 
