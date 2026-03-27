@@ -81,25 +81,27 @@ class _BaseIPyAPI:
 
     def _handle_error_response(self, response: httpx.Response) -> None:
         """Raise the appropriate exception for a non-200 response."""
-        if response.status_code == 400:
-            try:
-                error_data = response.json()
-                if isinstance(error_data, dict) and error_data.get("error"):
-                    error = ErrorResponse.from_dict(error_data)
-                    if "Invalid IP" in error.reason:
-                        raise InvalidIPAddressError(error.message)
-                    elif "Reserved IP" in error.reason:
-                        raise ReservedIPAddressError(error.message)
-                    raise BadRequestError(error.message)
-            except (ValueError, KeyError):
-                pass
-            raise BadRequestError("Bad Request")
-        elif response.status_code == 403:
-            raise ForbiddenError()
-        elif response.status_code == 404:
-            raise NotFoundError()
-        elif response.status_code == 405:
-            raise MethodNotAllowedError()
-        elif response.status_code == 429:
-            raise RateLimitError()
-        response.raise_for_status()
+        match response.status_code:
+            case 400:
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict) and error_data.get("error"):
+                        error = ErrorResponse.from_dict(error_data)
+                        if "Invalid IP" in error.reason:
+                            raise InvalidIPAddressError(error.message)
+                        elif "Reserved IP" in error.reason:
+                            raise ReservedIPAddressError(error.message)
+                        raise BadRequestError(error.message)
+                except ValueError:
+                    pass
+                raise BadRequestError("Bad Request")
+            case 403:
+                raise ForbiddenError()
+            case 404:
+                raise NotFoundError()
+            case 405:
+                raise MethodNotAllowedError()
+            case 429:
+                raise RateLimitError()
+            case _:
+                response.raise_for_status()

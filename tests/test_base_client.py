@@ -33,6 +33,7 @@ def test_base_custom_init():
     assert b._api_key == "key123"
     assert b._max_retries == 5
     assert b._retry_backoff == 2.0
+    assert b._timeout == 5.0
 
 
 def test_build_endpoint_with_ip(base):
