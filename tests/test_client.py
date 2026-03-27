@@ -1,8 +1,9 @@
 """Tests for synchronous client."""
 
+from unittest.mock import patch
+
 import pytest
 from pytest_httpx import HTTPXMock
-from unittest.mock import patch
 
 from ipyapi import IPyAPI
 from ipyapi.exceptions import (
@@ -269,8 +270,8 @@ def test_retry_on_rate_limit(httpx_mock: HTTPXMock, sample_response):
 
     assert location.ip == "8.8.8.8"
     assert mock_sleep.call_count == 2
-    mock_sleep.assert_any_call(1.0)   # backoff * 2^0
-    mock_sleep.assert_any_call(2.0)   # backoff * 2^1
+    mock_sleep.assert_any_call(1.0)  # backoff * 2^0
+    mock_sleep.assert_any_call(2.0)  # backoff * 2^1
 
 
 def test_retry_exhausted_raises(httpx_mock: HTTPXMock):

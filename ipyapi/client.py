@@ -5,7 +5,7 @@ from typing import Any, Literal, overload
 
 import httpx
 
-from ._base_client import _BaseIPyAPI, FieldName, ResponseFormat
+from ._base_client import FieldName, ResponseFormat, _BaseIPyAPI
 from .exceptions import RateLimitError
 from .models import IPLocation
 
