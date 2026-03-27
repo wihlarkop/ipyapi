@@ -354,7 +354,7 @@ def test_get_location_returns_pydantic_when_requested(httpx_mock: HTTPXMock, sam
             assert isinstance(result, PydanticIPLocation)
             assert result.ip == "8.8.8.8"
         else:
-            with pytest.raises(ImportError, match="uv add pydantic"):
+            with pytest.raises(ImportError, match=r"ipyapi\[pydantic\]"):
                 client.get_location("8.8.8.8", return_type=ReturnType.PYDANTIC)
 
 

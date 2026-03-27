@@ -104,7 +104,7 @@ class IPyAPI(_BaseIPyAPI):
                 if not _PYDANTIC_AVAILABLE:
                     raise ImportError(
                         "Pydantic is required for ReturnType.PYDANTIC. "
-                        "Install it with: uv add pydantic"
+                        "Install it with: pip install 'ipyapi[pydantic]' or uv add ipyapi[pydantic]"
                     )
                 return PydanticIPLocation.model_validate(data)
             case _:
