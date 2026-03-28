@@ -68,9 +68,7 @@ jobs:
         run: uv build
 
       - name: Check distribution
-        run: |
-          uv pip install twine --system
-          twine check dist/*
+        run: pipx run twine check dist/*
 
       - name: Create and push tag
         run: |
