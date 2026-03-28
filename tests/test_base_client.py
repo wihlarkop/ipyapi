@@ -1,7 +1,8 @@
 """Tests for _BaseIPyAPI shared base class."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from ipyapi._base_client import _BaseIPyAPI
 from ipyapi.exceptions import (
@@ -28,7 +29,13 @@ def test_base_default_init(base):
 
 
 def test_base_custom_init():
-    b = _BaseIPyAPI(api_key="key123", base_url="https://custom.co/", timeout=5.0, max_retries=5, retry_backoff=2.0)
+    b = _BaseIPyAPI(
+        api_key="key123",
+        base_url="https://custom.co/",
+        timeout=5.0,
+        max_retries=5,
+        retry_backoff=2.0,
+    )
     assert b._base_url == "https://custom.co"  # trailing slash stripped
     assert b._api_key == "key123"
     assert b._max_retries == 5
@@ -73,7 +80,7 @@ def test_validate_ip_invalid_partial(base):
 def test_handle_error_400_invalid_ip(base):
     response = MagicMock()
     response.status_code = 400
-    response.json.return_value = {"error": True, "reason": "Invalid IP Address", "message": "bad ip"}
+    response.json.return_value = {"error": True, "reason": "Invalid IP Address", "message": "bad"}
     with pytest.raises(InvalidIPAddressError):
         base._handle_error_response(response)
 
@@ -81,7 +88,7 @@ def test_handle_error_400_invalid_ip(base):
 def test_handle_error_400_reserved_ip(base):
     response = MagicMock()
     response.status_code = 400
-    response.json.return_value = {"error": True, "reason": "Reserved IP Address", "message": "reserved"}
+    response.json.return_value = {"error": True, "reason": "Reserved IP Address", "message": "rsv"}
     with pytest.raises(ReservedIPAddressError):
         base._handle_error_response(response)
 
