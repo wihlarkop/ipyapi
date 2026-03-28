@@ -1,9 +1,11 @@
 """Tests for asynchronous client."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from pytest_httpx import HTTPXMock
 
-from ipyapi import AsyncIPyAPI
+from ipyapi import AsyncIPyAPI, ReturnType
 from ipyapi.exceptions import (
     BadRequestError,
     InvalidIPAddressError,
@@ -83,7 +85,7 @@ async def test_get_location_dict_return(httpx_mock: HTTPXMock, sample_response):
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
 
     async with AsyncIPyAPI() as client:
-        location = await client.get_location("8.8.8.8", return_type="dict")
+        location = await client.get_location("8.8.8.8", return_type=ReturnType.DICT)
         assert isinstance(location, dict)
         assert location["ip"] == "8.8.8.8"
         assert location["city"] == "Mountain View"
@@ -182,27 +184,18 @@ async def test_convenience_methods(httpx_mock: HTTPXMock):
 
 @pytest.mark.asyncio
 async def test_rate_limit_error(httpx_mock: HTTPXMock):
-    """Test rate limit error handling."""
+    """Test rate limit error when retries are exhausted."""
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", status_code=429)
 
-    async with AsyncIPyAPI() as client:
+    async with AsyncIPyAPI(max_retries=0) as client:
         with pytest.raises(RateLimitError) as exc_info:
             await client.get_location("8.8.8.8")
         assert exc_info.value.status_code == 429
 
 
 @pytest.mark.asyncio
-async def test_invalid_ip_error(httpx_mock: HTTPXMock):
-    """Test invalid IP address error handling."""
-    error_response = {
-        "error": True,
-        "reason": "Invalid IP Address",
-        "message": "The provided IP address is invalid",
-    }
-    httpx_mock.add_response(
-        url="https://ipapi.co/invalid/json/", status_code=400, json=error_response
-    )
-
+async def test_invalid_ip_error():
+    """Test invalid IP address error is raised before HTTP request."""
     async with AsyncIPyAPI() as client:
         with pytest.raises(InvalidIPAddressError):
             await client.get_location("invalid")
@@ -249,3 +242,108 @@ async def test_custom_timeout():
     client = AsyncIPyAPI(timeout=30.0)
     assert client._client.timeout.read == 30.0
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_success_on_429(httpx_mock: HTTPXMock, sample_response):
+    """Test that a 429 followed by 200 succeeds after retry."""
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", status_code=429)
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        async with AsyncIPyAPI(max_retries=1, retry_backoff=0.0) as client:
+            location = await client.get_location("8.8.8.8")
+        mock_sleep.assert_awaited_once()
+
+    assert isinstance(location, IPLocation)
+    assert location.ip == "8.8.8.8"
+
+
+@pytest.mark.asyncio
+async def test_retry_exhausted_raises_rate_limit(httpx_mock: HTTPXMock):
+    """Test that exhausting all retries raises RateLimitError."""
+    for _ in range(3):
+        httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", status_code=429)
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        async with AsyncIPyAPI(max_retries=2, retry_backoff=0.0) as client:
+            with pytest.raises(RateLimitError):
+                await client.get_location("8.8.8.8")
+
+
+@pytest.mark.asyncio
+async def test_get_batch(httpx_mock: HTTPXMock, sample_response):
+    """Test get_batch returns results for all IPs."""
+    response_2 = {**sample_response, "ip": "1.1.1.1", "org": "Cloudflare"}
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    httpx_mock.add_response(url="https://ipapi.co/1.1.1.1/json/", json=response_2)
+
+    async with AsyncIPyAPI() as client:
+        results = await client.get_batch(["8.8.8.8", "1.1.1.1"])
+
+    assert len(results) == 2
+    assert {r.ip for r in results} == {"8.8.8.8", "1.1.1.1"}
+
+
+@pytest.mark.asyncio
+async def test_get_batch_dict_return(httpx_mock: HTTPXMock, sample_response):
+    """Test get_batch with ReturnType.DICT."""
+    response_2 = {**sample_response, "ip": "1.1.1.1"}
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    httpx_mock.add_response(url="https://ipapi.co/1.1.1.1/json/", json=response_2)
+
+    async with AsyncIPyAPI() as client:
+        results = await client.get_batch(["8.8.8.8", "1.1.1.1"], return_type=ReturnType.DICT)
+
+    assert all(isinstance(r, dict) for r in results)
+    assert {r["ip"] for r in results} == {"8.8.8.8", "1.1.1.1"}
+
+
+@pytest.mark.asyncio
+async def test_get_location_latlong_present(httpx_mock: HTTPXMock, sample_response):
+    """Test get_location includes latlong when present in response."""
+    response_with_latlong = {**sample_response, "latlong": "37.386,-122.0838"}
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=response_with_latlong)
+
+    async with AsyncIPyAPI() as client:
+        location = await client.get_location("8.8.8.8")
+
+    assert location.latlong == "37.386,-122.0838"
+
+
+@pytest.mark.asyncio
+async def test_get_location_latlong_absent(httpx_mock: HTTPXMock, sample_response):
+    """Test get_location has latlong as None when absent."""
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+
+    async with AsyncIPyAPI() as client:
+        location = await client.get_location("8.8.8.8")
+
+    assert location.latlong is None
+
+
+@pytest.mark.asyncio
+async def test_get_location_pydantic_return(httpx_mock: HTTPXMock, sample_response):
+    """Test get_location with ReturnType.PYDANTIC."""
+    pytest.importorskip("pydantic")
+    from ipyapi.models import PydanticIPLocation
+
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+
+    async with AsyncIPyAPI() as client:
+        location = await client.get_location("8.8.8.8", return_type=ReturnType.PYDANTIC)
+
+    assert isinstance(location, PydanticIPLocation)
+    assert location.ip == "8.8.8.8"
+    assert location.city == "Mountain View"
+
+
+@pytest.mark.asyncio
+async def test_get_location_pydantic_not_available(httpx_mock: HTTPXMock, sample_response):
+    """Test that ReturnType.PYDANTIC raises ImportError when pydantic is unavailable."""
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+
+    with patch("ipyapi.async_client._PYDANTIC_AVAILABLE", False):
+        async with AsyncIPyAPI() as client:
+            with pytest.raises(ImportError, match="ipyapi\\[pydantic\\]"):
+                await client.get_location("8.8.8.8", return_type=ReturnType.PYDANTIC)
