@@ -65,5 +65,5 @@ jobs:
 
       - name: Test installation
         run: |
-          python -m pip install --break-system-packages dist/*.whl
+          uv pip install dist/*.whl --system
           python -c "from ipyapi import IPyAPI, AsyncIPyAPI; print('Import successful!')"
