@@ -1,6 +1,6 @@
 [project]
 name = "ipyapi"
-version = "0.1.0"
+version = "0.2.0"
 description = "A modern Python client library for ipapi.co IP geolocation API"
 authors = [
     { name = "Edo", email = "wihlarko26@gmail.com" }
