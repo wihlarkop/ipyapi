@@ -1,9 +1,11 @@
 """Tests for synchronous client."""
 
+from unittest.mock import patch
+
 import pytest
 from pytest_httpx import HTTPXMock
 
-from ipyapi import IPyAPI
+from ipyapi import IPyAPI, ReturnType
 from ipyapi.exceptions import (
     BadRequestError,
     InvalidIPAddressError,
@@ -79,7 +81,7 @@ def test_get_location_dict_return(httpx_mock: HTTPXMock, sample_response):
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
 
     with IPyAPI() as client:
-        location = client.get_location("8.8.8.8", return_type="dict")
+        location = client.get_location("8.8.8.8", return_type=ReturnType.DICT)
         assert isinstance(location, dict)
         assert location["ip"] == "8.8.8.8"
         assert location["city"] == "Mountain View"
@@ -173,23 +175,14 @@ def test_rate_limit_error(httpx_mock: HTTPXMock):
     """Test rate limit error handling."""
     httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", status_code=429)
 
-    with IPyAPI() as client:
+    with IPyAPI(max_retries=0) as client:
         with pytest.raises(RateLimitError) as exc_info:
             client.get_location("8.8.8.8")
         assert exc_info.value.status_code == 429
 
 
-def test_invalid_ip_error(httpx_mock: HTTPXMock):
-    """Test invalid IP address error handling."""
-    error_response = {
-        "error": True,
-        "reason": "Invalid IP Address",
-        "message": "The provided IP address is invalid",
-    }
-    httpx_mock.add_response(
-        url="https://ipapi.co/invalid/json/", status_code=400, json=error_response
-    )
-
+def test_invalid_ip_error():
+    """Test invalid IP address error handling (client-side validation)."""
     with IPyAPI() as client:
         with pytest.raises(InvalidIPAddressError):
             client.get_location("invalid")
@@ -232,3 +225,159 @@ def test_custom_timeout():
     client = IPyAPI(timeout=30.0)
     assert client._client.timeout.read == 30.0
     client.close()
+
+
+def test_client_init_retry_defaults():
+    with IPyAPI() as client:
+        assert client._max_retries == 3
+        assert client._retry_backoff == 1.0
+
+
+def test_client_init_retry_custom():
+    with IPyAPI(max_retries=5, retry_backoff=2.0) as client:
+        assert client._max_retries == 5
+        assert client._retry_backoff == 2.0
+
+
+def test_validate_ip_before_request():
+    """InvalidIPAddressError raised client-side before any HTTP call."""
+    with IPyAPI() as client:
+        with pytest.raises(InvalidIPAddressError):
+            client.get_location("not-an-ip")
+
+
+def test_validate_ip_on_get_field():
+    with IPyAPI() as client:
+        with pytest.raises(InvalidIPAddressError):
+            client.get_field("city", "999.999.999.999")
+
+
+def test_validate_ip_on_get_location_raw():
+    with IPyAPI() as client:
+        with pytest.raises(InvalidIPAddressError):
+            client.get_location_raw("bad-ip")
+
+
+def test_retry_on_rate_limit(httpx_mock: HTTPXMock, sample_response):
+    """Retries up to max_retries times on 429, then succeeds."""
+    httpx_mock.add_response(status_code=429)
+    httpx_mock.add_response(status_code=429)
+    httpx_mock.add_response(status_code=200, json=sample_response)
+
+    with patch("time.sleep") as mock_sleep:
+        with IPyAPI(max_retries=3, retry_backoff=1.0) as client:
+            location = client.get_location("8.8.8.8")
+
+    assert location.ip == "8.8.8.8"
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_any_call(1.0)  # backoff * 2^0
+    mock_sleep.assert_any_call(2.0)  # backoff * 2^1
+
+
+def test_retry_exhausted_raises(httpx_mock: HTTPXMock):
+    """Raises RateLimitError after exhausting all retries."""
+    for _ in range(4):  # max_retries=3 → 4 attempts total
+        httpx_mock.add_response(status_code=429)
+
+    with patch("time.sleep"):
+        with IPyAPI(max_retries=3, retry_backoff=1.0) as client:
+            with pytest.raises(RateLimitError):
+                client.get_location("8.8.8.8")
+
+
+def test_get_batch_returns_list(httpx_mock: HTTPXMock, sample_response):
+    """get_batch returns list of IPLocation in input order."""
+    resp2 = {**sample_response, "ip": "1.1.1.1"}
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    httpx_mock.add_response(url="https://ipapi.co/1.1.1.1/json/", json=resp2)
+
+    with IPyAPI() as client:
+        results = client.get_batch(["8.8.8.8", "1.1.1.1"])
+
+    assert len(results) == 2
+    assert results[0].ip == "8.8.8.8"
+    assert results[1].ip == "1.1.1.1"
+
+
+def test_get_batch_empty():
+    with IPyAPI() as client:
+        assert client.get_batch([]) == []
+
+
+def test_get_batch_as_dict(httpx_mock: HTTPXMock, sample_response):
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+
+    with IPyAPI() as client:
+        results = client.get_batch(["8.8.8.8"], return_type=ReturnType.DICT)
+
+    assert isinstance(results[0], dict)
+    assert results[0]["ip"] == "8.8.8.8"
+
+
+def test_get_location_returns_object_by_default(httpx_mock: HTTPXMock, sample_response):
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    with IPyAPI() as client:
+        result = client.get_location("8.8.8.8")
+    assert isinstance(result, IPLocation)
+
+
+def test_get_location_returns_dict_when_requested(httpx_mock: HTTPXMock, sample_response):
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    with IPyAPI() as client:
+        result = client.get_location("8.8.8.8", return_type=ReturnType.DICT)
+    assert isinstance(result, dict)
+
+
+def test_get_location_latlong_field(httpx_mock: HTTPXMock, sample_response):
+    sample_response["latlong"] = "37.386,-122.0838"
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    with IPyAPI() as client:
+        location = client.get_location("8.8.8.8")
+    assert location.latlong == "37.386,-122.0838"
+
+
+def test_get_location_returns_pydantic_when_requested(httpx_mock: HTTPXMock, sample_response):
+    """get_location returns PydanticIPLocation when return_type=ReturnType.PYDANTIC."""
+    try:
+        import pydantic  # noqa: F401
+
+        pydantic_available = True
+    except ImportError:
+        pydantic_available = False
+
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    with IPyAPI() as client:
+        if pydantic_available:
+            from ipyapi.models import PydanticIPLocation
+
+            result = client.get_location("8.8.8.8", return_type=ReturnType.PYDANTIC)
+            assert isinstance(result, PydanticIPLocation)
+            assert result.ip == "8.8.8.8"
+        else:
+            with pytest.raises(ImportError, match=r"ipyapi\[pydantic\]"):
+                client.get_location("8.8.8.8", return_type=ReturnType.PYDANTIC)
+
+
+def test_get_batch_with_pydantic(httpx_mock: HTTPXMock, sample_response):
+    """get_batch returns list of PydanticIPLocation when return_type=ReturnType.PYDANTIC."""
+    try:
+        import pydantic  # noqa: F401
+
+        pydantic_available = True
+    except ImportError:
+        pydantic_available = False
+
+    resp2 = {**sample_response, "ip": "1.1.1.1"}
+    httpx_mock.add_response(url="https://ipapi.co/8.8.8.8/json/", json=sample_response)
+    httpx_mock.add_response(url="https://ipapi.co/1.1.1.1/json/", json=resp2)
+
+    with IPyAPI() as client:
+        if pydantic_available:
+            from ipyapi.models import PydanticIPLocation
+
+            results = client.get_batch(["8.8.8.8", "1.1.1.1"], return_type=ReturnType.PYDANTIC)
+            assert len(results) == 2
+            assert all(isinstance(r, PydanticIPLocation) for r in results)
+        else:
+            with pytest.raises(ImportError):
+                client.get_batch(["8.8.8.8", "1.1.1.1"], return_type=ReturnType.PYDANTIC)

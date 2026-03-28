@@ -92,6 +92,9 @@ class IPLocation:
     hostname: str | None = None
     """Hostname (optional field, requires hostname add-on)"""
 
+    latlong: str | None = None
+    """Combined latitude and longitude as comma-separated string (e.g. '37.386,-122.0838')"""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "IPLocation":
         """Create IPLocation from API response dictionary.
@@ -131,6 +134,7 @@ class IPLocation:
             asn=data.get("asn", ""),
             org=data.get("org", ""),
             hostname=data.get("hostname"),
+            latlong=data.get("latlong"),
         )
 
 
@@ -162,3 +166,48 @@ class ErrorResponse:
             reason=data.get("reason", ""),
             message=data.get("message", ""),
         )
+
+
+try:
+    from pydantic import BaseModel, ConfigDict
+
+    class PydanticIPLocation(BaseModel):
+        """Pydantic model for IP location data. Requires pydantic>=2.0."""
+
+        model_config = ConfigDict(extra="ignore")
+
+        ip: str
+        network: str
+        version: str
+        city: str | None = None
+        region: str | None = None
+        region_code: str | None = None
+        country: str
+        country_name: str
+        country_code: str
+        country_code_iso3: str
+        country_capital: str | None = None
+        country_tld: str
+        continent_code: str
+        in_eu: bool
+        postal: str | None = None
+        latitude: float
+        longitude: float
+        timezone: str
+        utc_offset: str
+        country_calling_code: str
+        currency: str
+        currency_name: str
+        languages: str
+        country_area: float | None = None
+        country_population: int | None = None
+        asn: str
+        org: str
+        hostname: str | None = None
+        latlong: str | None = None
+
+    _PYDANTIC_AVAILABLE = True
+
+except ImportError:
+    _PYDANTIC_AVAILABLE = False
+    PydanticIPLocation = None  # type: ignore[assignment,misc]
