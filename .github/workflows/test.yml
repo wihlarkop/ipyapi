@@ -65,5 +65,6 @@ jobs:
 
       - name: Test installation
         run: |
-          uv pip install dist/*.whl --system --break-system-packages
-          python -c "from ipyapi import IPyAPI, AsyncIPyAPI; print('Import successful!')"
+          uv venv .test-venv
+          uv pip install dist/*.whl --python .test-venv/bin/python
+          .test-venv/bin/python -c "from ipyapi import IPyAPI, AsyncIPyAPI; print('Import successful!')"
